@@ -1,0 +1,165 @@
+---
+title: "customerSegmentation"
+author: "Haizhou Yuan"
+date: "2024-04-05"
+output: html_document
+---
+
+Step 1: Data processing and irregular value dealing. 
+```{r}
+# Download required packages for data processing
+# options(repos = c(CRAN = "https://mirror.rcg.sfu.ca/mirror/CRAN/"))
+# install.packages("fastDummies")
+# install.packages('tidyverse', dependencies=TRUE, type="source")
+# install.packages("ggplot2")
+# install.packages("lubridate")
+# install.packages("dplyr")
+
+
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(stringr)
+library(fastDummies)
+
+# Read the data
+cars_data <- read.csv("car_data.csv") %>%
+    mutate(
+        Date = mdy(Date), # Convert Date to Date format assuming m/d/y format
+        Engine = gsub("Â", "", Engine), # Clean Engine column
+        Price = as.numeric(Price), # Ensure numeric
+        Gender = ifelse(Gender == "Male", 1, 0)
+    ) # Convert Gender to binary
+
+
+# Na dealing with categorical columns
+# Numeric columns: Replace NA with mean
+numeric_columns <- sapply(cars_data, is.numeric)
+cars_data[numeric_columns] <- lapply(cars_data[numeric_columns], function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x))
+
+cars_data_encoded <- dummy_cols(cars_data, select_columns = c("Transmission", "Color", "Body_Style", "Engine", "Dealer_Region"))
+# Drop the original columns to avoid multicollinearity
+cars_data_encoded <- select(cars_data_encoded, -c(Transmission, Color, `Body_Style`, Engine, Dealer_Region))
+cars_data_encoded <- fastDummies::dummy_cols(cars_data_encoded, select_columns = "Company", remove_first_dummy = TRUE)
+head(cars_data_encoded)
+```
+Step 2: Customer segmentation
+
+The Elbow Method is used to determine the optimal number of clusters for K-means clustering. The idea is to run K-means clustering on the dataset for a range of values of (k) (number of clusters) and for each value, calculate the total within-cluster sum of squares (WSS), which is a measure of variance within each cluster.
+```{r}
+# Compute total within-cluster sum of square
+set.seed(123) # Set seed for reproducibility
+columns_to_cluster <- c("Annual_Income", "Price")
+
+wss <- sapply(1:10, function(k){
+  kmeans(cars_data_encoded[, columns_to_cluster], centers=k, nstart=10 )$tot.withinss
+})
+
+# Plot the Elbow Curve
+plot(1:10, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+After the result from above plot, we can choose the kluster number for the k-means. And we can seperate the customer to 4 clusters based on their income level, the car price and car company
+```{r}
+# Replace K with the optimal number of clusters you determined from the Elbow Method
+optimal_k <- 8
+
+# Apply K-means clustering
+set.seed(123)
+
+# Clustering based on income, car price and car age
+kmeans_result <- kmeans(cars_data_encoded[, columns_to_cluster], centers=optimal_k, nstart=10 )
+
+
+# Adding the cluster assignment
+cars_data_encoded$Cluster <- as.factor(kmeans_result$cluster)
+head(cars_data_encoded)
+
+```
+
+Step 3: Profile analysis
+After performing K-means clustering, including both numeric variables and encoded categorical variables like "Company", the next step is to conduct a Profile Analysis. Profile Analysis involves examining the characteristics of each cluster to understand the segments better. This step is crucial for interpreting the results and applying them to make informed decisions.
+```{r}
+# Summary statistics for Annual_Income and Price by Cluster
+company_columns <- grep("^Company_", names(cars_data_encoded), value = TRUE)
+
+# Calculate the most prevalent company in each cluster
+most_prevalent_company <- cars_data_encoded %>%
+  select(c(Cluster, company_columns)) %>%
+  group_by(Cluster) %>%
+  summarise(across(all_of(company_columns), sum)) %>%
+  pivot_longer(cols = -Cluster, names_to = "Company", values_to = "Count") %>%
+  mutate(Company = gsub("Company_", "", Company)) %>%
+  arrange(desc(Count)) %>%
+  group_by(Cluster) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(-Count)
+
+summary_stats <- cars_data_encoded %>%
+  group_by(Cluster) %>%
+  summarise(
+    Average_Annual_Income = mean(Annual_Income, na.rm = TRUE),
+    Median_Annual_Income = median(Annual_Income, na.rm = TRUE),
+    Average_Price = mean(Price, na.rm = TRUE),
+    Median_Price = median(Price, na.rm = TRUE)
+  ) %>%
+  left_join(most_prevalent_company, by = "Cluster")
+
+print(summary_stats)
+```
+
+Step 4: PCA regression
+```{r}
+#install.packages("caret")
+library(caret)
+library(tidyverse)
+
+# Assuming `summary_stats` is your data frame and you want to exclude non-numeric columns for PCA
+data_for_pca <- summary_stats %>%
+  select_if(is.numeric) %>%
+  na.omit()  # Removing rows with NA values, consider more sophisticated imputation if necessary
+
+# Scaling the data
+data_scaled <- scale(data_for_pca)
+pca_result <- prcomp(data_scaled, center = TRUE, scale. = TRUE)
+summary(pca_result)
+
+# Example: Using the first two principal components
+pc_data <- as.data.frame(pca_result$x[, 1:2])
+# Assuming `Average_Price` is the outcome and is part of your original `summary_stats` data frame
+pc_data$Average_Price <- summary_stats$Average_Price[!is.na(rowSums(data_for_pca))]  # Matching rows after NA omission
+
+# Linear regression with the principal components
+model <- lm(Average_Price ~ ., data = pc_data)
+summary(model)
+
+# For cross-validation, you might consider using the `train` function from the `caret` package
+set.seed(123)  # For reproducibility
+train_control <- trainControl(method = "cv", number = 10)  # 10-fold cross-validation
+model_cv <- train(Average_Price ~ ., data = pc_data, method = "lm", trControl = train_control)
+summary(model_cv)
+
+
+```
+
+PCA Results
+
+PC1 (Principal Component 1) explains a substantial majority of the variance within the dataset, with a proportion of variance of 85.55%. This indicates that PC1 captures most of the underlying structure or pattern in the data.
+PC2 accounts for an additional 13.48% of the variance, bringing the cumulative proportion of variance explained by the first two components to 99.03%.
+The contributions of PC3 and PC4 to explaining the variance are minimal, at 0.968% and 0.004%, respectively.
+Given these results, it's clear that most of the information in the dataset can be effectively represented by the first two principal components, making them suitable candidates for use in further analyses, such as regression modeling.
+
+Regression Analysis
+The regression analysis, utilizing PC1 and PC2 as predictors for Average_Price, yielded the following key results:
+
+Coefficients: Both PC1 and PC2 have significant negative coefficients, -425.03 and -569.56, respectively, with very low p-values (PC1: 1.57e-05, PC2: 0.000335). This indicates a strong, statistically significant relationship between these principal components and the Average_Price. The negative coefficients suggest that as the values of PC1 and PC2 increase, the Average_Price tends to decrease.
+Intercept: The intercept value is 28472.46, with a very low p-value, indicating the average Average_Price when PC1 and PC2 are at their mean values (due to the scaling in PCA).
+Model Fit: The model has an exceptionally high Multiple R-squared of 0.9856, suggesting that 98.56% of the variability in Average_Price can be explained by PC1 and PC2. The Adjusted R-squared is 0.9798, which adjusts for the number of predictors and essentially provides the same interpretation in this context due to the high explanatory power of the model.
+F-Statistic: The F-statistic value is 170.9 with a p-value of 2.497e-05, indicating that the model is statistically significant. This means that there is a very low probability that these results could have occurred by chance, further validating the relationship between the principal components and Average_Price.
+Conclusion and Considerations
+The PCA followed by regression analysis indicates a strong and statistically significant model for predicting Average_Price based on the first two principal components derived from the dataset. The high R-squared value suggests an excellent fit, though it is essential to consider the risk of overfitting, especially given the small sample size (as indicated by the degrees of freedom in the regression analysis).
+
+Moreover, while the PCA has effectively reduced the dimensionality of the dataset and the regression model shows strong predictive power, the interpretation of the principal components themselves can be more challenging compared to using original variables. Each principal component is a linear combination of the original variables, and understanding their specific impact on Average_Price requires further analysis of the PCA loadings.
+
+Finally, it's crucial to validate these findings with additional data or through cross-validation to ensure the model's generalizability and robustness.
