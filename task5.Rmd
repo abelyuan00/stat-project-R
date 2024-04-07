@@ -1,0 +1,216 @@
+---
+title: "Project"
+author: "Chen Chen"
+date: "2024-04-06"
+output: html_document
+---
+
+`
+```{r, warning = FALSE, include = FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(stringr)
+library(fastDummies)
+library(lubridate)
+library(caret)
+```
+
+```{r}
+# load dataset
+cars_data <- read.csv("car_data.csv", head = TRUE)
+head(cars_data)
+```
+
+```{r}
+cars_data <- cars_data %>%
+    mutate(
+      Date = mdy(Date), # Convert Date to Date format assuming m/d/y format
+        Engine = gsub("Â", "", Engine), # Clean Engine column
+        Price = as.numeric(Price....), # Ensure numeric
+    )
+cars_data$Date <- as.Date(cars_data$Date)
+```
+
+# Data Visualization 
+```{r}
+# Aggregate sales count by month
+cars_data$month <- month(cars_data$Date)
+monthly_sales <- cars_data %>%
+  group_by(month) %>% 
+  summarize(Total_Count = n())
+
+# Plotting sales count by month to show seasonal patterns
+ggplot(monthly_sales, aes(x = month, y = Total_Count)) +
+  geom_line() +
+  labs(title = 'Monthly Sales Patterns', x = 'Month', y = 'Total Count') +
+  theme_minimal() +
+  scale_x_continuous(breaks = 1:12)
+```
+
+
+```{r}
+# Seasonal Distribution of Car Purchases
+cars_data$season <- quarter(cars_data$Date, with_year = FALSE)
+ggplot(cars_data, aes(x = factor(season), fill = factor(season))) +
+  geom_bar() +
+  scale_fill_manual(values = c("springgreen3", "skyblue", "gold", "tomato"),
+                     breaks = c("1", "2", "3", "4"),
+                     labels = c("Q1", "Q2", "Q3", "Q4")) +
+  labs(title = "Seasonal Distribution of Car Purchases", x = "Season", y = "Count")
+
+```
+Car sales are typically slow at the beginning of the year, peak in September, decline in October, and then reach another peak in November and December, winter is the busiest season of the year.
+
+```{r}
+# Distribution of Car Company
+company_counts <- cars_data %>%
+  count(Company) %>%
+  arrange(desc(n))
+
+ggplot(cars_data, aes(x = factor(Company, levels = company_counts$Company), fill = factor(Company))) +
+  geom_bar() +
+  geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5, size = 2, color = 'black')+
+  labs(title = "Distribution of Car Company", x = "Company", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+The top three best-selling car brands are Chevrolet, Dodge, and Ford.
+
+```{r}
+# Top 10 Selling Car Models
+top_models <- cars_data %>%
+  count(Model) %>%
+  arrange(desc(n)) %>%
+  head(10)
+
+ggplot(top_models, aes(x = reorder(Model, n), y = n, fill = Model)) +
+  geom_col() +
+  geom_text(aes(label = n), vjust = -0.5, size = 3, color = "black") +
+  labs(title = "Top 10 Selling Car Models", x = "Model", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +  
+  coord_flip()
+```
+The top 10 selling car models are Diamante, Prizm , Silhouette, Passat, Ram Pickup, Jetta ,RL ,LS400, LHS, A6,respectively.
+
+```{r}
+# Distribution of Dealer Region
+ggplot(cars_data, aes(x = Dealer_Region, fill = Dealer_Region)) +
+  geom_bar() +
+  geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5, size = 3, color = 'black')+
+  labs(title = "Distribution of Car Dealer Region", x = "Dealer Region", y = "Count") +
+  theme_bw()
+```
+The region with the highest sales revenue is Austin, Janesville, Scottsdale.
+
+```{r}
+# Distribution of Gender among car buyers
+gender_counts <- table(cars_data$Gender)
+
+pie(gender_counts, labels = paste(names(gender_counts), "(", round(gender_counts/sum(gender_counts)*100, 1), "%)", sep = ""), col = c("pink", "lightblue"))
+title("Distribution of Gender among car buyers")
+legend("topright", legend = c("Female", "Male"), fill = c("pink", "lightblue"))
+
+```
+The majority of car buyers are male, nearly four times more than female buyers.
+
+```{r}
+# Car Price Distribution
+ggplot(cars_data, aes(x = Price)) +
+  geom_histogram(binwidth = 5000, fill = "skyblue", color = "black") +
+  labs(title = "Car Price Distribution", x = "Price", y = "Count") +
+  theme_minimal()
+```
+The majority of car price sold range from 15000 to 40000.
+
+```{r}
+# Distribution of Annual Income
+incomex <- cars_data$Annual.Income/10000000
+ggplot(cars_data, aes(x = `incomex`, y = "")) +
+  geom_boxplot() +
+  labs(title = "Distribution of Annual Income", x = "Annual Income") +
+  theme(axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank())
+```
+
+```{r}
+# Distribution of Annual Income
+ggplot(cars_data, aes(x = `incomex`)) +
+  geom_histogram(bins = 70, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Annual Income", x = "Annual Income", y = "Count") 
+
+```
+
+```{r}
+# Distribution of Car color and Proportion of Gender
+gender_color <- cars_data %>%
+group_by(Gender, Color) %>%
+summarize(count = n())
+
+ggplot(gender_color, aes(x = Color, y = count, fill = factor(Gender))) +
+geom_bar(stat ="identity", position = "stack") +
+labs(title = "Distribution of Car color and Proportion of Gender", x = "Color", y = "Count")
+```
+The most popular color is pale white among both female and male. The black and red.
+```{r}
+# Distribution of Car Transmission
+Transmission_counts <- cars_data %>%
+  group_by(Transmission) %>%
+  summarize(count = n())
+
+ggplot(Transmission_counts, aes(x = "", y = count, fill = Transmission)) +
+  geom_bar(stat = "identity", width = 1) +
+  labs(title = "Distribution of Car Transmission", fill = "Transmission") +
+  coord_polar(theta = "y") +
+  theme_void() +
+  geom_text(aes(label = count), position = position_stack(vjust = 0.5))
+```
+People more prefered auto transmission.
+```{r}
+# Distribution of Car Body Style
+ggplot(cars_data, aes(x = Body.Style, fill = Body.Style)) +
+  geom_bar() +
+  labs(title = "Distribution of Car Body Style", x = "Car Body Style", y = "Count") +
+  theme_bw()
+```
+The best seller car body style is SUV, then hatchback.
+
+# Data preprocessing
+```{r}
+cars_data <- cars_data %>%
+  mutate(
+    Gender = as.numeric(factor(Gender, levels = c("Male", "Female"), labels = c(1, 0))),
+    Dealer_Name = as.numeric(factor(Dealer_Name)),
+    Company = as.numeric(factor(Company)),
+    Model = as.numeric(factor(Model)),
+    Transmission = as.numeric(factor(Transmission)),
+    Color = as.numeric(factor(Color)),
+    Body.Style = as.numeric(factor(Body.Style)),
+    Dealer_Region = as.numeric(factor(Dealer_Region))
+  )
+```
+
+
+
+# Random forest
+```{r}
+library(randomForest)
+set.seed(123) 
+filter_data <- select(cars_data, -Car_id, -Date, -Customer.Name, -Engine, -Dealer_No, -Phone)
+train_index <- sample(1:nrow(filter_data), 0.7 * nrow(filter_data)) 
+train_data <- filter_data[train_index, ]
+test_data <- filter_data[-train_index, ]
+```
+
+```{r}
+rf_model <- randomForest(Price ~ ., data = train_data)
+
+predictions <- predict(rf_model, newdata = test_data)
+
+threshold <- 500
+accuracy <- mean(abs(predictions - test_data$Price) <= threshold)
+print(paste("Accuracy (within $500):", accuracy))
+```
+From original dataset, we can notice that the car price is a whole number. However, the model predict car price always include decimal point. So we considered when predict price - original price less than 500, will considered the predict price is consistent with original price. So the final accuracy is 94.66%. This model can be used to predict future market trends.
+
