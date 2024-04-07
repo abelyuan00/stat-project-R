@@ -1,0 +1,258 @@
+---
+title: "Project Prediction"
+author: "Mauricio Gómez Macedo"
+date: "April 7, 2024"
+output: html_document
+---
+
+Person 3: Sales Prediction, Dealership Performance Analysis, and Ensemble Learning
+Sales Prediction Model
+
+Develop a predictive model for car sales.
+Dealership Performance Analysis
+
+Evaluate dealership performance across regions.
+Ensemble Learning
+
+Implement ensemble learning methods to improve the accuracy and robustness of the sales prediction model by combining multiple predictive models.
+
+Reading Dataset
+
+```{r }
+cars_df <- read.csv("cars_data_encoded.csv")
+
+```
+
+```{r }
+head(cars_df)
+```
+
+Selecting variables
+
+```{r }
+df <- cars_df[,c("Price","Gender", "Annual_Income", "Transmission_Auto",	"Transmission_Manual",	"Color_Black",	"Color_Pale_White",	"Color_Red",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Body_Style_SUV",
+"Engine_Double_Overhead_Camshaft",
+"Engine_Overhead_Camshaft",	"Dealer_Region_Aurora",	"Dealer_Region_Austin",	"Dealer_Region_Greenville",	"Dealer_Region_Janesville",	"Dealer_Region_Middletown",	"Dealer_Region_Pasco",	"Dealer_Region_Scottsdale",	"Car_Age"
+)]
+```
+
+
+```{r }
+head(df)
+```
+
+Splitting Data. 80% Train, 20% Test
+
+```{r }
+set.seed(6659)
+total_rows <- nrow(df)
+
+# Number of rows for training (80%)
+train_size <- round(0.8 * total_rows)
+
+# Indices of rows to be selected for training
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+
+# Create training dataset
+train_data <- df[train_indices, ]
+
+# Create testing dataset
+test_data <- df[-train_indices, ]
+```
+
+
+Linear Regression
+
+
+```{r }
+model <- lm(Price ~ ., data = train_data)
+
+```
+
+```{r }
+anova(model)
+```
+
+Removing variables (1 by 1)
+
+Removing Dealer_Region_Middletown
+
+```{r }
+df <- cars_df[,c("Price","Gender", "Annual_Income", "Transmission_Auto",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Dealer_Region_Aurora",	"Dealer_Region_Austin",	"Dealer_Region_Greenville",	"Dealer_Region_Janesville",	"Car_Age"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+Removing Dalear_Region_Janesville
+
+```{r }
+df <- cars_df[,c("Price","Gender", "Annual_Income", "Transmission_Auto",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Dealer_Region_Aurora",	"Dealer_Region_Austin",	"Dealer_Region_Greenville",	"Car_Age"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+Removing Gender
+
+```{r }
+df <- cars_df[,c("Price", "Annual_Income", "Transmission_Auto",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Dealer_Region_Aurora",	"Dealer_Region_Austin",	"Dealer_Region_Greenville",	"Car_Age"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+Removing Car_Age
+
+```{r }
+df <- cars_df[,c("Price", "Annual_Income", "Transmission_Auto",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Dealer_Region_Aurora",	"Dealer_Region_Austin",	"Dealer_Region_Greenville"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+Removing Dealear_Region_Aurora
+
+```{r }
+df <- cars_df[,c("Price", "Annual_Income", "Transmission_Auto",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Dealer_Region_Austin",	"Dealer_Region_Greenville"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+Removing Dealear_Region_Greenville
+
+```{r }
+df <- cars_df[,c("Price", "Annual_Income", "Transmission_Auto",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Dealer_Region_Austin"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+Removing Dealear_Region_Austin
+
+```{r }
+df <- cars_df[,c("Price", "Annual_Income", "Transmission_Auto",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+Removing Transmission_Auto
+
+```{r }
+df <- cars_df[,c("Price", "Annual_Income",	"Color_Black",	"Color_Pale_White",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan"
+)]
+
+train_size <- round(0.8 * total_rows)
+train_indices <- sample(1:total_rows, train_size, replace = FALSE)
+df_scale <- as.data.frame(scale(df))
+train_data <- df_scale[train_indices, ]
+test_data <- df_scale[-train_indices, ]
+
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+
+```{r }
+predictions <- predict(model, newdata = test_data)
+```
+
+```{r }
+library(Metrics)
+
+rmse_value <- rmse(test_data$Price, predictions)
+
+```
+
+
+```{r }
+summary(model)$r.squared
+
+```
+
+
+```{r }
+library(randomForest)
+
+df <- cars_df[,c("Price","Gender", "Annual_Income", "Transmission_Auto",	"Transmission_Manual",	"Color_Black",	"Color_Pale_White",	"Color_Red",	"Body_Style_Hardtop",	"Body_Style_Hatchback",	"Body_Style_Passenger",	"Body_Style_Sedan",	"Body_Style_SUV",
+"Engine_Double_Overhead_Camshaft",
+"Engine_Overhead_Camshaft",	"Dealer_Region_Aurora",	"Dealer_Region_Austin",	"Dealer_Region_Greenville",	"Dealer_Region_Janesville",	"Dealer_Region_Middletown",	"Dealer_Region_Pasco",	"Dealer_Region_Scottsdale",	"Car_Age"
+)]
+
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+rf_model <- randomForest(Price ~ ., data = train_data)
+
+
+
+
+```
+
+```{r }
+predictions <- predict(rf_model, newdata = test_data)
+
+rmse_value <- sqrt(mean((test_data$Price - predictions)^2))
+
+# Calculate R-squared (R2)
+mean_actual <- mean(test_data$Price)
+ss_total <- sum((test_data$Price - mean_actual)^2)
+ss_residual <- sum((test_data$Price - predictions)^2)
+r_squared_value <- 1 - (ss_residual / ss_total)
+
+# Print RMSE and R-squared (R2)
+print(paste("RMSE:", rmse_value))
+print(paste("R-squared (R2):", r_squared_value))
+
+```
