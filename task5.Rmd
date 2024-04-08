@@ -5,7 +5,9 @@ date: "2024-04-06"
 output: html_document
 ---
 
-`
+# Introduction
+The dataset we used is from Kaggle, which is a car sale report among same certain area of United States. There are 16 columns, including car id, purchase date, customer name, gender, annual income, dealer name, car company, car model, engine, transmission, color, price, dealer number, body style, phone and dealer region. 
+
 ```{r, warning = FALSE, include = FALSE}
 library(dplyr)
 library(tidyr)
@@ -15,6 +17,7 @@ library(stringr)
 library(fastDummies)
 library(lubridate)
 library(caret)
+library(shiny)
 ```
 
 ```{r}
@@ -31,9 +34,88 @@ cars_data <- cars_data %>%
         Price = as.numeric(Price....), # Ensure numeric
     )
 cars_data$Date <- as.Date(cars_data$Date)
+cars_data$month <- month(cars_data$Date)
+cars_data$season <- quarter(cars_data$Date, with_year = FALSE)
 ```
 
-# Data Visualization 
+# Interactive Dashboard
+```{r}
+# Lookup history car price via different dealer and car type
+ui_his_price <- fluidPage(
+  titlePanel("History Car Price Lookup"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("dealer_name", "Select Dealer Name:", choices = unique(cars_data$Dealer_Name)),
+      selectInput("company", "Select Car Company:", choices = unique(cars_data$Company)),
+      selectInput("model", "Select Car Model:", choices = unique(cars_data$Model)),
+      selectInput("transmission", "Select Transmission Type:", choices = unique(cars_data$Transmission)),
+      selectInput("color", "Select Car Color:", choices = unique(cars_data$Color)),
+      selectInput("Body.Style", "Select Car Body Style:", choices = unique(cars_data$Body.Style))),
+    mainPanel(
+      textOutput("price_output")
+    )
+  )
+)
+
+server_his_price <- function(input, output) {
+  output$price_output <- renderText({
+    filtered_data <- cars_data %>%
+      filter(Dealer_Name == input$dealer_name,
+             Company == input$company,
+             Model == input$model,
+             Transmission == input$transmission,
+             Color == input$color,
+             Body.Style == input$Body.Style)
+    
+    if (nrow(filtered_data) > 0) {
+      paste("The price is:", paste(unique(filtered_data$Price), collapse = ", "), "USD")
+    } else {
+      "No matching car price information"
+    }
+  })
+}
+
+shinyApp(ui = ui_his_price, server = server_his_price)
+
+```
+
+```{r}
+# Distribution of sale by date
+ui_date <- fluidPage(
+  titlePanel("Car Sales Dashboard"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("company", "Select Company:", choices = unique(cars_data$Company)),
+      sliderInput("price_range", "Select Price Range:", min = 0, max = 500000, value = c(0, 50000))
+    ),
+    mainPanel(
+      plotOutput("sales_plot")
+    )
+  )
+)
+
+
+server_date <- function(input, output) {
+
+  filtered_data <- reactive({
+    filter(cars_data, Company == input$company & Price >= input$price_range[1] & Price <= input$price_range[2])
+  })
+  
+
+  output$sales_plot <- renderPlot({
+    ggplot(filtered_data(), aes(x = Date, y = Price, color = Dealer_Name)) +
+      geom_point() +
+      labs(title = "Sales by Date", x = "Date", y = "Price")
+  })
+}
+
+
+shinyApp(ui = ui_date, server = server_date)
+
+```
+# Data visualization 
+Car sales are typically slow at the beginning of the year, peak in September, decline in October, and then reach another peak in November and December, winter is the busiest season of the year.  The top three best-selling car brands are Chevrolet, Dodge, and Ford. The top 10 selling car models are Diamante, Prizm , Silhouette, Passat, Ram Pickup, Jetta ,RL ,LS400, LHS, A6,respectively. The region with the highest sales revenue is Austin, Janesville, Scottsdale. The majority of car buyers are male, nearly four times greater than female buyers. Car price around 20000 seems most popular. The most popular color is pale white among both female and male. Then black and red. People more preferred auto transmission. The best seller car body style is SUV, then hatchback.
+
 ```{r}
 # Aggregate sales count by month
 cars_data$month <- month(cars_data$Date)
@@ -48,20 +130,6 @@ ggplot(monthly_sales, aes(x = month, y = Total_Count)) +
   theme_minimal() +
   scale_x_continuous(breaks = 1:12)
 ```
-
-
-```{r}
-# Seasonal Distribution of Car Purchases
-cars_data$season <- quarter(cars_data$Date, with_year = FALSE)
-ggplot(cars_data, aes(x = factor(season), fill = factor(season))) +
-  geom_bar() +
-  scale_fill_manual(values = c("springgreen3", "skyblue", "gold", "tomato"),
-                     breaks = c("1", "2", "3", "4"),
-                     labels = c("Q1", "Q2", "Q3", "Q4")) +
-  labs(title = "Seasonal Distribution of Car Purchases", x = "Season", y = "Count")
-
-```
-Car sales are typically slow at the beginning of the year, peak in September, decline in October, and then reach another peak in November and December, winter is the busiest season of the year.
 
 ```{r}
 # Distribution of Car Company
@@ -123,7 +191,7 @@ ggplot(cars_data, aes(x = Price)) +
   labs(title = "Car Price Distribution", x = "Price", y = "Count") +
   theme_minimal()
 ```
-The majority of car price sold range from 15000 to 40000.
+Car price around 20000 seems most popular.
 
 ```{r}
 # Distribution of Annual Income
@@ -152,7 +220,7 @@ ggplot(gender_color, aes(x = Color, y = count, fill = factor(Gender))) +
 geom_bar(stat ="identity", position = "stack") +
 labs(title = "Distribution of Car color and Proportion of Gender", x = "Color", y = "Count")
 ```
-The most popular color is pale white among both female and male. The black and red.
+The most popular color is pale white among both female and male. Then black and red.
 ```{r}
 # Distribution of Car Transmission
 Transmission_counts <- cars_data %>%
@@ -177,6 +245,7 @@ ggplot(cars_data, aes(x = Body.Style, fill = Body.Style)) +
 The best seller car body style is SUV, then hatchback.
 
 # Data preprocessing
+For data preprocessing, we converted Date column to date format assuming consistently format, modified the Engine column which contains special characters, and encoded some string columns. In final feature selection, we delete car id, data, customer name, engine, dealer number and phone columns, and the rest columns will be the feature colunm.
 ```{r}
 cars_data <- cars_data %>%
   mutate(
@@ -193,7 +262,10 @@ cars_data <- cars_data %>%
 
 
 
-# Random forest
+# Methodology
+
+For model building, we used random forest regression try to predict the car price. From original dataset, we can notice that the car price is always a whole number. However, the model predict car price always include decimal point. So we considered when predict price minus original price is less than 500, then will considered the predict price is consistent with original price. So the final accuracy is 94.66%. This model can be used to predict car price and also future market trends.
+
 ```{r}
 library(randomForest)
 set.seed(123) 
@@ -201,6 +273,8 @@ filter_data <- select(cars_data, -Car_id, -Date, -Customer.Name, -Engine, -Deale
 train_index <- sample(1:nrow(filter_data), 0.7 * nrow(filter_data)) 
 train_data <- filter_data[train_index, ]
 test_data <- filter_data[-train_index, ]
+dim(train_data)
+dim(test_data)
 ```
 
 ```{r}
@@ -212,5 +286,50 @@ threshold <- 500
 accuracy <- mean(abs(predictions - test_data$Price) <= threshold)
 print(paste("Accuracy (within $500):", accuracy))
 ```
-From original dataset, we can notice that the car price is a whole number. However, the model predict car price always include decimal point. So we considered when predict price - original price less than 500, will considered the predict price is consistent with original price. So the final accuracy is 94.66%. This model can be used to predict future market trends.
+
+```{r}
+# Car price prediction among different dealer
+ui_predict <- fluidPage(
+  titlePanel("Car Price Prediction"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("dealer", "Dealer Name", choices = unique(cars_data$Dealer_Name)),
+      selectInput("company", "Company", choices = unique(cars_data$Company)),
+      selectInput("model", "Model", choices = unique(cars_data$Model)),
+      selectInput("transmission", "Transmission", choices = unique(cars_data$Transmission)),
+      selectInput("body_style", "Body Style", choices = unique(cars_data$Body.Style)),
+      actionButton("predict_button", "Predict")
+    ),
+    mainPanel(
+      textOutput("predicted_price")
+    )
+  )
+)
+
+server_predict <- function(input, output) {
+
+  filtered_data <- reactive({
+    filter(data, Dealer_Name == input$dealer &
+                    Company == input$company &
+                    Model == input$model &
+                    Transmission == input$transmission &
+                    Body.Style == input$body_style)
+  })
+  
+  # Predict price using random forest model
+  output$prediction_text <- renderText({
+    rf_model <- randomForest(Price ~ ., data = cars_data)
+    prediction <- predict(rf_model, newdata = filtered_data())
+    paste("Predicted Price:", prediction, "USD")
+  })
+}
+
+shinyApp(ui = ui_predict, server = server_predict)
+
+
+```
+
+
+
+
 
