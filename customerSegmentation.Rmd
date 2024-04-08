@@ -59,7 +59,7 @@ wss <- sapply(1:10, function(k){
 plot(1:10, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
 ```
 
-After the result from above plot, we can choose the kluster number for the k-means. And we can seperate the customer to 4 clusters based on their income level, the car price and car company
+After the result from above plot, we can choose the kluster number for the k-means. And we can seperate the customer to 8 clusters based on their income level, the car price and car company
 ```{r}
 # Replace K with the optimal number of clusters you determined from the Elbow Method
 optimal_k <- 8
@@ -115,30 +115,91 @@ Step 4: PCA regression
 library(caret)
 library(tidyverse)
 
-# Assuming `summary_stats` is your data frame and you want to exclude non-numeric columns for PCA
 data_for_pca <- summary_stats %>%
   select_if(is.numeric) %>%
-  na.omit()  # Removing rows with NA values, consider more sophisticated imputation if necessary
+  na.omit()  # Removing rows with NA values
 
 # Scaling the data
 data_scaled <- scale(data_for_pca)
 pca_result <- prcomp(data_scaled, center = TRUE, scale. = TRUE)
 summary(pca_result)
 
-# Example: Using the first two principal components
 pc_data <- as.data.frame(pca_result$x[, 1:2])
-# Assuming `Average_Price` is the outcome and is part of your original `summary_stats` data frame
 pc_data$Average_Price <- summary_stats$Average_Price[!is.na(rowSums(data_for_pca))]  # Matching rows after NA omission
 
 # Linear regression with the principal components
 model <- lm(Average_Price ~ ., data = pc_data)
 summary(model)
 
-# For cross-validation, you might consider using the `train` function from the `caret` package
 set.seed(123)  # For reproducibility
 train_control <- trainControl(method = "cv", number = 10)  # 10-fold cross-validation
 model_cv <- train(Average_Price ~ ., data = pc_data, method = "lm", trControl = train_control)
 summary(model_cv)
+
+
+```
+```{r}
+# Plotting residuals vs. fitted values
+plot(model$fitted.values, resid(model),
+     xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residuals vs. Fitted Values")
+abline(h = 0, col = "red")
+pc_data$Predicted_Price <- predict(model, newdata = pc_data)
+ggplot(pc_data, aes(x = PC1, y = PC2, color = Predicted_Price)) +
+  geom_point() +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(title = "PC1 vs PC2 colored by Predicted Price",
+       x = "Principal Component 1", y = "Principal Component 2")
+ggplot(pc_data, aes(x = Average_Price, y = Predicted_Price)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+  labs(title = "Actual vs. Predicted Prices",
+       x = "Actual Price", y = "Predicted Price")
+
+
+```
+
+```{r}
+# Scree plot
+plot(pca_result$sdev^2 / sum(pca_result$sdev^2), xlab="Principal Component", ylab="Variance Explained", type='b', main="Scree Plot")
+
+library(ggplot2)
+
+# PCA data plot
+ggplot(pc_data, aes(x=PC1, y=PC2, color=Average_Price)) +
+  geom_point() +
+  scale_color_gradient(low="blue", high="red") +
+  labs(title="PC1 vs PC2 colored by Average Price", x="Principal Component 1", y="Principal Component 2")
+
+# Plotting residuals
+plot(model$residuals, type='p', main="Residuals Plot", ylab="Residuals", xlab="Observation Index")
+abline(h=0, col="red")
+
+
+ggplot(cars_data_encoded, aes(x = Annual_Income, y = Price, color = Cluster)) +
+  geom_point(alpha = 0.7) +  # Adjust point transparency with alpha
+  scale_color_manual(values = rainbow(length(unique(cars_data_encoded$Cluster)))) +  # Color coding by cluster
+  theme_minimal() +
+  labs(title = "K-means Clustering of Cars Data",
+       subtitle = "Based on Annual Income and Price",
+       x = "Annual Income",
+       y = "Price",
+       color = "Cluster") +
+  theme(legend.position = "right")  # Adjust legend position as needed
+
+
+ggplot(summary_stats, aes(x = Average_Annual_Income, y = Average_Price, label = Cluster)) +
+  geom_point(aes(color = Cluster), size = 4) +  # Plot average income vs. price, colored by cluster
+  geom_text(aes(label = paste("Cluster", Cluster, "\n", Company)), 
+            vjust = -1, hjust = 0.5, check_overlap = TRUE, fontface = "italic") +  # Annotate with company
+  scale_color_manual(values = rainbow(n = length(unique(summary_stats$Cluster)))) +  # Custom colors
+  theme_minimal() +
+  labs(title = "Cluster Summary: Average Annual Income vs. Average Price",
+       subtitle = "Annotated with Most Prevalent Company",
+       x = "Average Annual Income",
+       y = "Average Price",
+       color = "Cluster") +
+  theme(legend.position = "none")  # Hide legend if cluster labels are clear
 
 
 ```
