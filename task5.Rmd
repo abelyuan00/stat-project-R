@@ -77,10 +77,11 @@ server_his_price <- function(input, output) {
 
 shinyApp(ui = ui_his_price, server = server_his_price)
 
+
 ```
 
 ```{r}
-# Distribution of sale by date
+# Car Sales Dashboard by date
 ui_date <- fluidPage(
   titlePanel("Car Sales Dashboard"),
   sidebarLayout(
@@ -247,7 +248,7 @@ The best seller car body style is SUV, then hatchback.
 # Data preprocessing
 For data preprocessing, we converted Date column to date format assuming consistently format, modified the Engine column which contains special characters, and encoded some string columns. In final feature selection, we delete car id, data, customer name, engine, dealer number and phone columns, and the rest columns will be the feature colunm.
 ```{r}
-cars_data <- cars_data %>%
+cars_data_enco <- cars_data %>%
   mutate(
     Gender = as.numeric(factor(Gender, levels = c("Male", "Female"), labels = c(1, 0))),
     Dealer_Name = as.numeric(factor(Dealer_Name)),
@@ -269,7 +270,7 @@ For model building, we used random forest regression try to predict the car pric
 ```{r}
 library(randomForest)
 set.seed(123) 
-filter_data <- select(cars_data, -Car_id, -Date, -Customer.Name, -Engine, -Dealer_No, -Phone)
+filter_data <- select(cars_data_enco, -Car_id, -Date, -Customer.Name, -Engine, -Dealer_No, -Phone)
 train_index <- sample(1:nrow(filter_data), 0.7 * nrow(filter_data)) 
 train_data <- filter_data[train_index, ]
 test_data <- filter_data[-train_index, ]
@@ -288,7 +289,7 @@ print(paste("Accuracy (within $500):", accuracy))
 ```
 
 ```{r}
-# Car price prediction among different dealer
+# Car price prediction among different dealer(Super slow)
 ui_predict <- fluidPage(
   titlePanel("Car Price Prediction"),
   sidebarLayout(
