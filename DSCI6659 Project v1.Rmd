@@ -1,0 +1,674 @@
+---
+title: "DSCI6659 Data Analysis of Car Sales Data"
+author: "Chiaki Ikeda"
+date: "2024-03-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+library(ggplot2)
+library(fastDummies)
+library(corrplot)
+library(rrcov)
+library(mdqc)
+#library(rsvd)
+#install.packages("xfun")
+```
+
+
+## DSCI6659 Project Report 
+
+
+
+```{r}
+# load data set
+df_car = read.csv(file = "C:/Users/ci58x/Downloads/archive (1)/Car Sales.xlsx - car_data.csv", header = T)
+```
+
+
+```{r}
+head(df_car)
+```
+
+### Overview of car sales data set (before data cleaning)
+
+Data was obtained from Kaggle https://www.kaggle.com/datasets/missionjee/car-sales-report.
+
+In this data set, 23906 observations with 16 variables are included.There is no missing values detected. Except for "Annual.Income", "Dealer_No", and "Price", the rest of variables are character. 
+
+For data analysis, we do not use identification information, such as "Car_id", "Customer.Name", "Dealer_Name","Dealer_No", and "Phone".
+
+
+```{r}
+names(df_car)
+```
+
+
+```{r}
+str(df_car)
+```
+
+```{r}
+summary(df_car)
+```
+
+
+### 1. Interpretation of each variable and data preprocessing 
+
+We selected variables that are our interests, keeping car_id for the data integration.  
+
+```{r}
+df_car_selected <- data.frame(df_car[, -c(3, 6, 13, 15)])
+summary(df_car_selected)
+
+write.csv(df_car_selected, "car_sales_selected_variables.csv")
+```
+
+In the selected data, now we have 12 variables including "Car_id", which refers to unique identifier for each car in the data set. 
+
+```{r}
+names(df_car_selected)
+```
+
+#### V2: "Date" - Date of car sales transaction
+
+This data starts from January 2, 2022 to December 31, 2023, which is the daily car sale transaction over two years. Each bar represents the number of car sales in the month. As shown in the histogram below, car sales transaction increases in September, November, and December both in 2022 and 2023. 
+
+
+```{r}
+df_car_selected1 <- df_car_selected
+df_car_selected1$Date <- as.Date(df_car_selected1$Date, format = "%m/%d/%Y")
+
+summary(df_car_selected1$Date)
+
+hist(df_car_selected1$Date, breaks = "months", xlab = "Date", ylab = "Transaction Frequency (%)", main = "Monthly Car Sales", col = 'blue')
+
+ggplot(df_car_selected1, aes(x = Date)) + geom_histogram(bins = 24, fill = "steelblue3") + labs(x = "Date", y = "Transaction Frequency (%)", title = "Monthly Car Sales") +
+  theme_minimal()
+
+ggsave(file = "Monthly Car Sales.jpeg", plot = last_plot(), device = jpeg, width = 250, height = 100, units = 'mm')
+```
+
+
+#### V3: "Gender" - Gender of the customer, either Male or Female
+
+Gender is a categorical variable including two classes, "Male" and "Female". In this data set, male customers account for 79% (21% for females) of total car sales transactions. 
+
+```{r}
+df_car_selected1$Gender <- as.factor(df_car_selected1$Gender)
+unique(df_car_selected1$Gender)
+```
+
+```{r}
+summary(df_car_selected1$Gender)
+
+male_per <- 18798/23906*100
+female_per <- 5108/23906*100
+print(c('Female %' = female_per, 'Male %' = male_per))
+```
+
+```{r}
+barplot(table(df_car_selected1$Gender),  main = "Number of Customer by Gender", 
+        xlab = "Gender", ylab = "Count", col = c("red", "blue"), legend.text = TRUE)
+
+```
+
+#### V4: "Annual.Income" - Annual Income of Customers ($)
+
+
+The annual income of customers are in the range from 10.1 k to 11.2 million dollars. Overall, the distribution is right-skewed, suggesting that more observations fall in lower incomes. 
+
+
+```{r}
+summary(df_car_selected1$Annual.Income)
+```
+
+```{r}
+par(mfrow = c(2,1))
+hist(df_car_selected1$Annual.Income, main = "Distrubution of Annual Income", xlab = NULL)
+
+boxplot(df_car_selected1$Annual.Income, horizontal = TRUE, xlab = "Annual Income")
+```
+
+
+#### V5: "Company" - Company or Brand of the Car Purchased
+
+In this variable, we have 30 brands/companies as shown below. Chevrolet seems to be the most popular brand accounting for 7.6%, followed by Dodge (7.0%) and Ford (6.8%). 
+
+
+```{r}
+df_car_selected1$Company <- as.factor(df_car_selected1$Company)
+
+length(unique(df_car_selected1$Company))
+unique(df_car_selected1$Company)
+```
+
+```{r}
+# Counts
+summary(factor(df_car_selected1$Company, levels = names(sort(table(df_car_selected1$Company), decreasing = TRUE))))
+
+# Percentage (%)
+summary(factor(df_car_selected1$Company, levels = names(sort(table(df_car_selected1$Company), decreasing = TRUE)))) / 23906*100
+```
+
+```{r}
+company_counts <- table(factor(df_car_selected1$Company))
+sorted_companies <- names(sort(company_counts, decreasing = TRUE))
+ordered_companies <- factor(df_car_selected1$Company, levels = sorted_companies)
+barplot(table(ordered_companies), main = "Car Sales Transaction by Brand", ylab = "Count", las = 2, ylim = c(0, 2000),cex.axis = 0.8)
+```
+
+
+#### V6: "Model" - Model Name of the Car
+
+This is a categorical variable of model of the car, including 154 different models. The most popular model is Diamante accounting for about 1.75%, followed by Prizm and Silhouette (1.72% for both).
+
+
+```{r}
+df_car_selected1$Model <- as.factor(df_car_selected1$Model)
+length(unique(df_car_selected1$Model))
+unique(df_car_selected1$Model)
+```
+
+```{r}
+# Counts
+summary(df_car_selected1$Model, levels = names(sort(table(df_car_selected1$Company), decreasing = TRUE)))
+
+# Percentage (%)
+summary(df_car_selected1$Model, levels = names(sort(table(df_car_selected1$Company), decreasing = TRUE))) / 23906*100
+```
+
+```{r}
+model_counts <- table(factor(df_car_selected1$Model))
+sorted_models <- names(sort(model_counts, decreasing = TRUE))
+ordered_models <- factor(df_car_selected1$Model, levels = sorted_models)
+barplot(table(ordered_models)[1:20], main = "Car Sales Transaction of Top 20 Brands", ylab = "Count", las = 2, ylim = c(0, 500), cex.axis = 0.8)
+```
+
+
+#### V7: "Engine" - Specifications of the Car Engine
+
+Variable "Engine" is also a categorical variable including 2 classes, either DoubleÃ Overhead Camshaft or Overhead Camshaft. In this modified data set, we call them "Double A" and "Overhead Camshaft". Among two types of engines, Double A is slightly more popular than the other one. The percentages of Double A and Camshaft are 53% and 47%, respectively.   
+
+
+```{r}
+df_car_selected1$Engine
+df_car_selected1$Engine[df_car_selected1$Engine != "Overhead Camshaft"] <- "Double A"
+
+df_car_selected1$Engine <- as.factor(df_car_selected1$Engine)
+
+length(unique(df_car_selected1$Engine))
+summary(unique(df_car_selected1$Engine))
+
+```
+
+```{r}
+# Counts
+summary(df_car_selected1$Engine)
+
+# Percentage (%)
+summary(df_car_selected1$Engine) / 23906*100
+```
+
+```{r}
+barplot(table(df_car_selected1$Engine),  main = "Car Sales Transcation by Engine Type", 
+        xlab = "Engine", ylab = "Count", ylim = c(0, 15000), col = c("green3", "purple"), 
+        legend.text = TRUE)
+
+```
+
+
+#### V8: "Transmission" - Type of Transmission in the Car
+
+Variable "Transmission" has a class of two type of transmission of the car in the data set, either Auto or Manual. Overall, Automatic cars are purchased more than Manual cars, accounting for 53% of the total transaction, while the rest of 47% is manual transmission cars. 
+
+
+```{r}
+unique(df_car_selected1$Transmission)
+df_car_selected1$Transmission <- as.factor(df_car_selected1$Transmission)
+```
+
+```{r}
+# Counts
+summary(df_car_selected1$Transmission)
+
+# Percentage
+summary(df_car_selected1$Transmission) / 23906*100
+```
+
+
+```{r}
+barplot(table(df_car_selected1$Transmission),  main = "Car Sales Transcation by Transmission", 
+        xlab = "Engine", ylab = "Count", col = c("lightblue", "pink"), legend.text = TRUE)
+```
+
+
+#### V9: "Color" - Color of the Exterior of the Car
+
+This variable refers to the color of the car, including 3 classes of black, red, and pale white. 
+
+```{r}
+unique(df_car_selected1$Color)
+df_car_selected1$Color <- as.factor(df_car_selected1$Color)
+
+```
+
+```{r}
+# Counts
+summary(df_car_selected1$Color)
+
+# Percentage
+summary(df_car_selected1$Color) / 23906*100
+```
+
+
+```{r}
+barplot(table(df_car_selected1$Color),  main = "Car Sales Transcation by Color", 
+        xlab = "Color", ylab = "Count", col = c("grey1", "ivory", "red2"), legend.text = TRUE)
+
+jpeg(file = "Car Sales Transcation by Color.jpeg", width = 100, height = 100, units = "mm", res =300)
+
+barplot(table(df_car_selected1$Color),  main = "Car Sales Transcation by Color", 
+        xlab = "Color", ylab = "Count", col = c("grey1", "ivory", "red2"), legend.text = TRUE)
+
+# Close the device
+dev.off()
+```
+
+
+#### V10: "Price" - Listed Sales Price of the Car
+
+The price of the car is in the range from 1.2k to 85.8 k dollars. The distribution is right-skewed, which is similar to that of the annual income of customers. The median is 23k and the mean price is 28 k. 
+
+```{r}
+summary(df_car_selected1$Price)
+```
+
+
+```{r}
+par(mfrow = c(2,1))
+hist(df_car_selected1$Price, main = "Distrubution of Car Price", xlab = NULL)
+
+boxplot(df_car_selected1$Price, horizontal = TRUE, xlab = "Annual Income")
+```
+
+
+#### V11: "Body.Style" - Style or Design of the Car's Body
+
+This variable represents car's body style including 5 categories SUV, Passenger, Hatchback, Hardtop, and Sedan. Among these five classes, SUV and Hatchback are two top styles accounting for 27% and 26%, respectively. Passenger cars are the least popular, which are 17% of the total transaction. 
+
+
+```{r}
+unique(df_car_selected1$Body.Style)
+df_car_selected1$Body.Style <- as.factor(df_car_selected1$Body.Style)
+```
+
+```{r}
+# Counts
+summary(df_car_selected1$Body.Style)
+
+# Percentage
+summary(df_car_selected1$Body.Style) / 23906*100
+```
+
+```{r}
+body_counts <- table(factor(df_car_selected1$Body.Style))
+sorted_body <- names(sort(body_counts, decreasing = TRUE))
+ordered_body <- factor(df_car_selected1$Body.Style, levels = sorted_body)
+
+barplot(table(ordered_body), main = "Car Sales Transaction by Car Body Styles", ylab = "Count", las = 2, ylim = c(0, 7000), cex.axis = 0.8, col = c('purple','palegreen3', 'orange2', 'cornflowerblue', 'pink2'))
+
+jpeg(file = "Car Sales Transaction by Car Body Styles.jpeg", width = 150, height = 100, units = "mm", res =300)
+barplot(table(ordered_body), main = "Car Sales Transaction by Car Body Styles", ylab = "Count", las = 2, ylim = c(0, 7000), cex.axis = 0.8, col = c('purple','palegreen3', 'orange2', 'cornflowerblue', 'pink2'))
+
+dev.off()
+```
+
+
+#### V12: "Dealer_Region" - Geographic Region of the Car Dealer 
+
+The region includes seven areas including Middletown, Aurora, Greenville, Pasco, Janeville, Scottsdale, and Austin. The most common region is Austin accounting for 17%, followed by Janesville (16%) and the rest of regional rates are in the range from 13-14%. 
+
+```{r}
+unique(df_car_selected1$Dealer_Region)
+df_car_selected1$Dealer_Region <- as.factor(df_car_selected1$Dealer_Region)
+```
+
+```{r}
+# Counts
+summary(df_car_selected1$Dealer_Region)
+
+# Percentage
+summary(df_car_selected1$Dealer_Region) / 23906*100
+```
+
+```{r}
+region_counts <- table(factor(df_car_selected1$Dealer_Region))
+sorted_region <- names(sort(region_counts, decreasing = TRUE))
+ordered_region <- factor(df_car_selected1$Dealer_Region, levels = sorted_region)
+barplot(table(ordered_region), ylim = c(0, 4500), main = "Car Sales Transaction by Dealer Region", ylab = "Count", las = 2, cex.axis = 0.8)
+```
+
+#### Summary
+
+After the transformation of data type, the summary of the new data set is as shown below.
+
+```{r}
+summary(df_car_selected1)
+```
+
+To sum up, cars are sold the most in September, November, and December by mostly male customers. 
+Chevrolet, Dodge, and Ford are well-selling brands, and customers prefer SUV or Hatchback, with pale white color. Diamante by Mitsubishi, Prizm by Chevrolet and Silhouette by Oldsmobile are the most popular models. There is no huge difference between transmission types and engine types. The car price and customer's annual income showed similar trends, with the right-skewed distributions. Car dealers are most commonly located in Austin and Janeville in this data set, that may be associated with the income distribution as customers in this region are richer than others to afford to purchase a car.   
+
+
+
+### 2. Relationship between variables in the data set
+
+
+First, we check whether customer's income is associated with annual income. As shown below, high income customers do not necessarily purchase expensive cars.  
+
+```{r}
+ggplot(df_car_selected1, aes(x = Annual.Income, y = Price, color = Price)) +
+  geom_point() + labs(x = "Annual Income", y = "Car Price", color = "Price") +
+  ggtitle("Customer's Income vs. Car Price")
+
+ggsave(file = "income vs price.jpeg", plot = last_plot(), device = jpeg)
+```
+
+
+Next, we check the relationship between dealer region and customers' annual income. As we expected, Austin, the most common locations of dealers, has a slightly higher income distribution. However, the second common region, Janesville has a similar distribution to others. 
+
+```{r}
+ggplot(df_car_selected1, aes(x = Annual.Income, y = Dealer_Region, color = Annual.Income)) +
+  geom_point() + labs(x = "Annual Income", y = "Region", color = "Annual Income") +
+  ggtitle("Annual Income vs. Region")
+
+ggplot(df_car_selected1, aes(x = Dealer_Region, y = Annual.Income, fill = Dealer_Region)) +
+  geom_boxplot() +
+  labs(x = "Region", y = "Annual Income", fill = "Region") +
+  ggtitle("Annual Income Distribution by Region")
+```
+
+Furthermore, we check whether the well-selling color is cheaper than other colors. Overall, we can see Black is the most expensive and pale white is the least expensive color. Hence, this supports the assumption that customers prefer the color due to the lower price. 
+
+
+
+
+```{r}
+ggplot(df_car_selected1, aes(x = Color, y = Price, fill = Color)) +
+  geom_boxplot() + labs(x = "Color", y = "Car Price", fill = "Color") +
+  ggtitle("Color vs. Car Price")
+```
+
+We also try to check whether car sales increases when the price becomes cheaper or customer's income becomes higher. Blue lines indicates months with higher car sales. As shown below, the car price does not seems to be associated with the months people purchased car the most. However, the income tends to be higher in summer, before the season of higher car sales. Hence, customer's income may be associated with car purchasing behavior. 
+
+```{r}
+df_car_with_dummy <- df_car_selected1
+```
+
+
+```{r}
+df_car_selected1$Month <- format(df_car_selected1$Date, "%Y-%m")
+mean_price_by_month <- tapply(df_car_selected1$Price, df_car_selected1$Month, mean)
+
+plot(mean_price_by_month, type = "o", 
+     xlab = "Month", ylab = "Mean Price",
+     main = "Mean Price by Month") 
+abline(v = c(9, 11, 12, 21, 23, 24), col = "blue", lty = 2)
+
+
+
+df_car_selected1$Month <- format(df_car_selected1$Date, "%Y-%m")
+mean_income_by_month <- tapply(df_car_selected1$Annual.Income, df_car_selected1$Month, mean)
+
+plot(mean_income_by_month, type = "o", 
+     xlab = "Month", ylab = "Mean Annual Income",
+     main = "Mean Annual Income by Month")
+abline(v = c(9, 11, 12, 21, 23, 24), col = "blue", lty = 2)
+
+jpeg(file = "Mean_Annual_Income_by_Month.jpeg", width = 250, height = 100, units = "mm", res =300)
+
+plot(mean_income_by_month, type = "o", 
+     xlab = "Month", ylab = "Mean Annual Income",
+     main = "Mean Annual Income by Month")
+abline(v = c(9, 11, 12, 21, 23, 24), col = "blue", lty = 2)
+
+# Close the device
+dev.off()
+```
+
+
+```{r}
+head(df_car_with_dummy)
+
+# Gender: Male = 1, Female = 0
+df_car_with_dummy$Gender <- ifelse(df_car_with_dummy$Gender == "Male", 1, 0)
+
+# Engine:  Double A = 1, Shamcraft Overhead = 0
+df_car_with_dummy$Engine <- ifelse(df_car_with_dummy$Engine == "Double A", 1, 0)
+
+# Transmission:  Auto = 1, Manual = 0
+df_car_with_dummy$Transmission <- ifelse(df_car_with_dummy$Transmission == "Auto", 1, 0)
+
+# Create dummy columns for the rest of categorical variables
+car_dummy_cols <- dummy_cols(df_car_with_dummy, select_columns = c("Company", "Model", "Color", "Body.Style", "Dealer_Region" ))
+
+# Create binary data
+df_car_binary <- cbind(df_car_with_dummy[, 1:4], df_car_with_dummy[, 7:8], 'Price' = df_car_with_dummy[, 10], car_dummy_cols[, -(1:12)])
+write.csv(df_car_binary, "car_sales_binary_dummy.csv")
+
+#head(df_car_binary[1:37])
+
+#head(df_car_binary[192:206])
+
+```
+
+
+Between Price and other variables, we can clearly see Cadillac is positively associated with Price, and Hyndai is negatively associated with Price. Also, Engine type Double A is highly correlated with Auto transmission. 
+
+```{r}
+# Removing "Model" and "Dealer_Region"
+df_cor <- cbind(df_car_binary[, 3:37], df_car_binary[, 192:199])
+df_cor <- cbind('Price' = df_cor$Price, df_cor[, -5])
+head(df_cor)
+
+correlation_matrix <- cor(df_cor)  
+heatmap(correlation_matrix)
+corrplot(correlation_matrix, method = "color", type = "upper", tl.cex = 0.7)
+
+jpeg(file = "correlation_matrix.jpeg", width = 200, height = 200, units = "mm", res =300)
+corrplot(correlation_matrix, method = "color", type = "upper", tl.cex = 0.7)
+
+dev.off()
+```
+
+
+### 3. Robust PCA analysis
+
+```{r}
+df_car_numeric <- df_car_with_dummy
+
+# Company
+df_car_numeric$Company <- as.integer(df_car_with_dummy$Company)
+
+# Model 
+df_car_numeric$Model <- as.integer(df_car_with_dummy$Model)
+
+# Color 
+df_car_numeric$Color <- as.integer(df_car_with_dummy$Color)
+
+# Body.Style 
+df_car_numeric$Body.Style <- as.integer(df_car_with_dummy$Body.Style)
+
+# Dealer_Region
+df_car_numeric$Dealer_Region <- as.integer(df_car_with_dummy$Dealer_Region)
+
+summary(df_car_numeric)
+```
+
+
+```{r}
+remove_outliers <- function(data, threshold = 1.5) {
+  remove_row <- rep(FALSE, nrow(data))
+  for (col in names(data)) {
+    q1 <- quantile(data[[col]], 0.25)
+    q3 <- quantile(data[[col]], 0.75)
+    iqr <- q3 - q1
+    lower_bound <- q1 - threshold * iqr
+    upper_bound <- q3 + threshold * iqr
+    remove_row <- remove_row | data[[col]] < lower_bound | data[[col]] > upper_bound
+                           }
+  cleaned_data <- data[!remove_row, ]
+  return(cleaned_data)
+}
+```
+
+
+```{r}
+data_matrix <- data.frame(df_car_numeric[, 4:6], df_car_numeric[, 9:12])
+
+cleaned_matrix <- remove_outliers(data_matrix)
+
+
+robust_mean <- apply(cleaned_matrix, 2, median)
+robust_mcd <- CovMcd(cleaned_matrix)$cov
+
+mqcc(cleaned_matrix, type = c("T2", "T2.single"), center=robust_mean, cov = robust_mcd, 
+     title = "T2 chart using robust estimator")
+```
+
+
+```{r}
+cleaned_matrix <- scale(cleaned_matrix)
+prout <- PcaHubert(cleaned_matrix)
+summary(prout)
+```
+
+
+
+```{r}
+eigenvalues <- prout$eigenvalues
+
+variance_explained <- eigenvalues / sum(eigenvalues)
+
+
+cumulative_variance_explained <- cumsum(variance_explained)
+
+
+plot(1:length(variance_explained), variance_explained, 
+     type = "b", pch = 19, col = "blue",
+     xlab = "Principal Component", ylab = "Proportion of Variance Explained",
+     main = "Variance Contribution Plot")
+
+lines(1:length(cumulative_variance_explained), cumulative_variance_explained, 
+      type = "b", pch = 19, col = "red")
+
+legend("topright", legend = c("Variance Explained", "Cumulative Variance Explained"),
+       col = c("blue", "red"), pch = 19, lty = 1)
+```
+
+
+```{r}
+biplot(prout)
+loadings <- prout$loadings[, 1:2] 
+
+loadings_df <- data.frame(Variable = rownames(loadings), PC1 = loadings[, 1], PC2 = loadings[, 2])
+
+ggplot(loadings_df, aes(x = PC1, y = PC2, label = Variable)) + geom_text() +
+  xlab("PC1") + ylab("PC2") + ggtitle("Loading Plot")
+```
+
+```{r}
+ggplot(loadings_df, aes(x = PC1, y = PC2, label = Variable)) +
+  geom_text() +  
+  geom_point() +  
+  geom_segment(aes(xend = 0, yend = 0), 
+               arrow = arrow(length = unit(0.3, "cm")),  
+               color = "blue") +  
+  xlab("PC1") + ylab("PC2") + 
+  ggtitle("Loading Plot")  
+```
+
+```{r}
+
+plot(prout$loadings[,1:2],   
+     pch=21,            
+     bg="#fc8d62",       
+     cex=1,             
+)
+text(prout$loadings[,1:2],            
+     labels=rownames(prout$loadings)  
+)
+
+```
+
+
+```{r}
+#install.packages('rsvd')
+
+rpca_model <- rpca(cleaned_matrix)
+
+principal_components <- rpca_model$x
+
+reconstruction_errors <- rowSums((cleaned_matrix - rpca_model$x)^2)
+
+threshold <- quantile(reconstruction_errors, 0.95)
+
+anomalies <- which(reconstruction_errors > threshold)
+
+
+
+
+
+anomaly_scores <- reconstruction_errors
+
+normalized_anomaly_scores <- anomaly_scores / max(anomaly_scores)
+
+plot(1:length(normalized_anomaly_scores), normalized_anomaly_scores,
+     type = "l", xlab = "Index", ylab = "Normalized Anomaly Scores",
+     main = "Anomaly Scores Plot")
+```
+
+```{r}
+Sigma = quantile(reconstruction_errors, 0.75) - quantile(reconstruction_errors, 0.25)
+
+anomalies <- which(reconstruction_errors > 3*Sigma)
+
+plot(reconstruction_errors, type = "l", xlab = "Index", ylab = "Reconstruction Error", main = "Anormaly Detection", col = 'grey')
+abline(h = threshold, col = "red", lty = 2)
+points(anomalies, reconstruction_errors[anomalies], col = "red", pch = 20)
+legend("topright", legend = c("Reconstruction Errors", "Threshold"), col = c("grey", "red"), lty = c(1, 2), pch = c(NA, 20))
+```
+
+
+
+```{r}
+summary(rpca_model)
+```
+
+```{r}
+
+plot(rpca_model)[1]
+```
+
+
+```{r}
+without_anomalies <- cleaned_matrix[-anomalies, ]
+rpca_model2 <- rpca(without_anomalies)
+
+```
+
+
+
+```{r}
+summary(rpca_model2)
+```
+
+```{r}
+plot(rpca_model2)
+```
+
