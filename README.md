@@ -27,5 +27,5 @@ Task 3 (Sales Prediction, Dealership Performance Analysis, and Ensemble Learning
 
 Task 4 (Robust Discriminant Analysis, Sentiment Analysis, and Penalized Linear Discriminant Analysis): Michael Bimal  
 
-Task 5 (Visualization, Reporting, Interactive Dashboard Development, and Discriminant Adaptive Nearest Neighbor Classification): Chen Chen 
+Task 5 (Visualization, Reporting, Interactive Dashboard Development, and Random Forest Regression): Chen Chen 
 
