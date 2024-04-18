@@ -1,5 +1,5 @@
 ---
-title: "Project"
+title: "Car Sales Report - Visualization, Interactive Dashboard Development, and Random Forest Regression"
 author: "Chen Chen"
 date: "2024-04-06"
 output: html_document
@@ -39,6 +39,7 @@ cars_data$season <- quarter(cars_data$Date, with_year = FALSE)
 ```
 
 # Interactive Dashboard
+The first dashboard is history car price lookup. It can be used for search history car price by select different dealer and car type. For dealers, this dashboard can be used to query the historical selling prices of various models from their peers, enabling them to set prices strategically to enhance their competitiveness.
 ```{r}
 # Lookup history car price via different dealer and car type
 ui_his_price <- fluidPage(
@@ -79,7 +80,7 @@ shinyApp(ui = ui_his_price, server = server_his_price)
 
 
 ```
-
+The second dashboard is car sales dashboard. By selecting certain car brand company and price range, showed dealer sales scatter plot of each date.
 ```{r}
 # Car Sales Dashboard by date
 ui_date <- fluidPage(
@@ -286,48 +287,6 @@ predictions <- predict(rf_model, newdata = test_data)
 threshold <- 500
 accuracy <- mean(abs(predictions - test_data$Price) <= threshold)
 print(paste("Accuracy (within $500):", accuracy))
-```
-
-```{r}
-# Car price prediction among different dealer(Super slow)
-ui_predict <- fluidPage(
-  titlePanel("Car Price Prediction"),
-  sidebarLayout(
-    sidebarPanel(
-      selectInput("dealer", "Dealer Name", choices = unique(cars_data$Dealer_Name)),
-      selectInput("company", "Company", choices = unique(cars_data$Company)),
-      selectInput("model", "Model", choices = unique(cars_data$Model)),
-      selectInput("transmission", "Transmission", choices = unique(cars_data$Transmission)),
-      selectInput("body_style", "Body Style", choices = unique(cars_data$Body.Style)),
-      actionButton("predict_button", "Predict")
-    ),
-    mainPanel(
-      textOutput("predicted_price")
-    )
-  )
-)
-
-server_predict <- function(input, output) {
-
-  filtered_data <- reactive({
-    filter(data, Dealer_Name == input$dealer &
-                    Company == input$company &
-                    Model == input$model &
-                    Transmission == input$transmission &
-                    Body.Style == input$body_style)
-  })
-  
-  # Predict price using random forest model
-  output$prediction_text <- renderText({
-    rf_model <- randomForest(Price ~ ., data = cars_data)
-    prediction <- predict(rf_model, newdata = filtered_data())
-    paste("Predicted Price:", prediction, "USD")
-  })
-}
-
-shinyApp(ui = ui_predict, server = server_predict)
-
-
 ```
 
 
