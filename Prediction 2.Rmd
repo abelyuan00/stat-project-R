@@ -1,0 +1,297 @@
+
+# Task 3 (Sales Prediction, Dealership Performance Analysis, and Ensemble Learning)
+Person 3: Sales Prediction, Dealership Performance Analysis, and Ensemble Learning
+Sales Prediction Model
+
+Develop a predictive model for car sales.
+Dealership Performance Analysis
+
+Evaluate dealership performance across regions.
+Ensemble Learning
+
+Implement ensemble learning methods to improve the accuracy and robustness of the sales prediction model by combining multiple predictive models.
+
+Reading Dataset
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(stringr)
+library(fastDummies)
+library(lubridate)
+library(caret)
+cars_data <- read.csv("car_data.csv", head = TRUE)
+cars_data <- cars_data %>%
+    mutate(
+      Date = mdy(Date), # Convert Date to Date format assuming m/d/y format
+        Engine = gsub("Â", "", Engine), # Clean Engine column
+        Price = as.numeric(Price) # Ensure numeric
+)
+
+cars_data$Date <- as.Date(cars_data$Date)
+cars_data$month <- month(cars_data$Date)
+cars_data$season <- quarter(cars_data$Date, with_year = FALSE)
+```
+
+```{r}
+colnames(cars_data)
+```
+
+```{r}
+cars_data["Dealer_Region"]
+```
+
+
+```{r}
+cars_data <- cars_data %>%
+  mutate(
+    Gender = as.numeric(factor(Gender, levels = c("Male", "Female"), labels = c(1, 0))),
+    Dealer_Name = as.numeric(factor(Dealer_Name)),
+    Company = as.numeric(factor(Company)),
+    Model = as.numeric(factor(Model)),
+    Transmission = as.numeric(factor(Transmission)),
+    Color = as.numeric(factor(Color)),
+    Body_Style = as.numeric(factor(Body_Style)),
+    Dealer_Region = as.numeric(factor(Dealer_Region))
+  )
+```
+
+
+```{r }
+set.seed(6659)
+
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region)
+
+train_indices <- sample(1:nrow(filter_data), 0.7 * nrow(filter_data)) 
+train_data <- filter_data[train_indices, ]
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+```{r }
+colnames(filter_data)
+
+anova(model)
+```
+
+
+```{r }
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region, -month)
+
+train_data <- filter_data[train_indices, ]
+
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+
+
+```{r }
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region, -month, -Gender)
+
+train_data <- filter_data[train_indices, ]
+
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+
+```{r }
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region, -month, -season, -Gender)
+
+train_data <- filter_data[train_indices, ]
+
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+```{r }
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region, -month, -season, -Gender, -Color)
+
+train_data <- filter_data[train_indices, ]
+
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+
+```{r }
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region, -month, -season, -Gender, -Dealer_Name, -Color)
+
+train_data <- filter_data[train_indices, ]
+
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+```{r }
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region, -month, -season, -Gender, -Dealer_Name, -Color)
+
+train_data <- filter_data[train_indices, ]
+
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+```{r }
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Phone, -Dealer_No, -Dealer_Region, -month, -season, -Gender, -Dealer_Name, -Color, -Body_Style)
+
+train_data <- filter_data[train_indices, ]
+
+test_data <- filter_data[-train_indices, ]
+model <- lm(Price ~ ., data = train_data)
+
+anova(model)
+```
+
+```{r }
+max(filter_data[,c("Price")])
+
+
+```
+
+```{r }
+predictions <- predict(model, newdata = train_data)
+threshold <- 500
+accuracy <- mean(abs(predictions - train_data$Price) <= threshold)
+print(paste("Accuracy (within $500):", accuracy))
+
+
+```
+
+
+
+```{r}
+set.seed(6659) 
+filter_data <- select(cars_data, -Car_id, -Date, -Customer_Name, -Engine, -Dealer_No, -Phone)
+train_index <- sample(1:nrow(filter_data), 0.7 * nrow(filter_data)) 
+train_data <- filter_data[train_index, ]
+test_data <- filter_data[-train_index, ]
+```
+
+```{r }
+head(filter_data)
+```
+
+```{r}
+library(randomForest)
+rf_model <- randomForest(Price ~ ., data = train_data, ntree = 500, mtry = 30, nodesize = 15)
+predictions <- predict(rf_model, newdata = test_data)
+threshold <- 500
+accuracy <- mean(abs(predictions - test_data$Price) <= threshold)
+print(paste("Accuracy (within $500):", accuracy))
+```
+
+```{r}
+threshold <- mean(abs(predictions - test_data$Price))
+accuracy <- mean(abs(predictions - test_data$Price) <= threshold)
+print(paste("Accuracy (within $500):", accuracy))
+```
+
+```{r}
+mean(abs(predictions - test_data$Price))
+
+```
+
+
+```{r}
+threshold <- 500
+accuracy <- mean(abs(predictions - test_data$Price) <= threshold)
+print(paste("Accuracy (within $500):", accuracy))
+```
+
+
+```{r}
+library(dplyr)  # For data manipulation
+library(ggplot2)  # For visualization
+
+customer_segmentation <- cars_data %>%
+  group_by(Gender, Company, Model) %>%
+  summarise(total_sales = n()) %>%
+  arrange(desc(total_sales))
+
+```
+
+
+```{r}
+colnames(cars_data)
+```
+
+```{r}
+customer_segmentation
+```
+
+```{r}
+top_selling_models <- cars_data %>%
+  group_by(Company, Model) %>%
+  summarise(total_sales = n()) %>%
+  arrange(desc(total_sales)) %>%
+  top_n(10)
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Assuming 'car_data' is your dataset
+
+# Group data by Dealer_Region and Model, then calculate total sales for each combination
+sales_by_region <- cars_data %>%
+  group_by(Dealer_Region, Company) %>%
+  summarise(total_sales = n()) %>%
+  arrange(Dealer_Region, desc(total_sales)) %>%
+  group_by(Dealer_Region) %>%
+  top_n(3, total_sales)  # Select the top selling car model for each region
+
+# Plot the most sold cars by Dealer_Region
+ggplot(sales_by_region, aes(x = Dealer_Region, y = total_sales, fill = Company)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Most Sold Cars by Dealer Region", x = "Dealer Region", y = "Total Sales") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_viridis_d()  # Change the color scale if desired
+```
+
+```{r}
+average_price_by_region <- cars_data %>%
+  group_by(Dealer_Region) %>%
+  summarise(avg_price = mean(Price, na.rm = TRUE))
+
+# Define a color palette
+region_colors <- c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+
+# Plot the average price by Dealer_Region with specified colors
+ggplot(average_price_by_region, aes(x = Dealer_Region, y = avg_price, fill = Dealer_Region)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Price by Dealer Region", x = "Dealer Region", y = "Average Price") +
+  scale_fill_manual(values = region_colors) +  # Specify the color palette
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+ggplot(cars_data, aes(x = Dealer_Region, fill = Body_Style)) +
+  geom_bar(position = "stack") +
+  labs(title = "Body Style Distribution by Dealer Region", x = "Dealer Region", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_viridis_d()
+```
