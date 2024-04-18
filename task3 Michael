@@ -1,0 +1,98 @@
+Robust discriminant analysis
+#load the libraries
+library(robustbase)  
+library(caret)       
+library(nnet)  
+library(ggplot2)
+
+data$Segment <- cut(data$Price, breaks=c(-Inf, 15000, 30000, Inf), labels=c("Economy", "Mid-Range", "Luxury"))
+
+# Splitting data into training and testing sets
+set.seed(123) 
+training_indices <- createDataPartition(data$Segment, p=0.8, list=FALSE)
+train_data <- data[training_indices,]
+test_data <- data[-training_indices,]
+
+
+# Assuming 'Price' is the target and needs to be converted into segments
+data$Segment <- cut(data$Price, breaks=c(-Inf, 15000, 30000, Inf), labels=c("Economy", "Mid-Range", "Luxury"))
+
+# Splitting data into training and testing sets
+set.seed(123) 
+training_indices <- createDataPartition(data$Segment, p=0.8, list=FALSE)
+train_data <- data[training_indices,]
+test_data <- data[-training_indices,]
+
+# Robust Linear Discriminant Analysis
+rlda_model <- lda(Segment ~ Gender + Annual_Income + Transmission_Auto + Body_Style_SUV + other_predictors, 
+                  data = train_data, method = "robust")
+
+# Prediction and evaluation
+predictions <- predict(rlda_model, test_data)
+confusionMatrix <- table(predictions$class, test_data$Segment)
+print(confusionMatrix)
+
+# Calculating accuracy
+accuracy <- sum(predictions$class == test_data$Segment) / nrow(test_data)
+print(paste("Accuracy:", accuracy))
+
+Multinomial Logistic Regression
+data$body_style <- apply(data[, c("Body_Style_Hardtop", "Body_Style_Hatchback", 
+                                  "Body_Style_Passenger", "Body_Style_Sedan", 
+                                  "Body_Style_SUV")], 1, function(x) {
+                                    ifelse(x[1] == 1, "Hardtop",
+                                           ifelse(x[2] == 1, "Hatchback",
+                                                  ifelse(x[3] == 1, "Passenger",
+                                                         ifelse(x[4] == 1, "Sedan", "SUV"))))
+                                  })
+
+install.packages("nnet")
+
+library(nnet)
+# Convert body_style to a factor
+data$body_style <- as.factor(data$body_style)
+
+# Fit the multinomial logistic regression model
+model <- multinom(body_style ~ Gender + Annual_Income, data = data)
+
+# Summary of the model
+summary(model)
+
+
+
+
+# Create a mosaic plot of body style preference by gender
+mosaicplot(table(data$body_style, data$Gender), 
+           main = "Body Style Preference by Gender",
+           xlab = "Body Style",
+           ylab = "Gender")
+
+
+
+# Creating a single factor variable for body style
+data$body_style <- apply(data[, c("Body_Style_Hardtop", "Body_Style_Hatchback", 
+                                  "Body_Style_Passenger", "Body_Style_Sedan", 
+                                  "Body_Style_SUV")], 1, function(x) {
+                                    names(which.max(x))
+                                  })
+
+# Convert to factor
+data$body_style <- as.factor(data$body_style)
+data$Gender <- as.factor(data$Gender)  
+
+# Create a bar plot of body style preference by gender
+ggplot(data, aes(x = body_style, fill = Gender)) +
+  geom_bar(position = "dodge") +
+  labs(x = "Body Style", y = "Count", fill = "Gender") +
+  theme_minimal() +
+  ggtitle("Body Style Preference by Gender")
+
+
+# Create a violin plot of annual income by body style
+ggplot(data, aes(x = body_style, y = Annual_Income)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, fill = "white") +
+  labs(x = "Body Style", y = "Annual Income") +
+  theme_minimal() +
+  ggtitle("Annual Income Distribution by Body Style")
+
